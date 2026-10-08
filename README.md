@@ -1,0 +1,204 @@
+# NetGuard AI
+
+AI-Powered Network Intrusion Detection & Threat Classification Platform
+
+## Overview
+
+NetGuard AI is a network security monitoring platform that detects, classifies, and alerts on suspicious network traffic. The system uses machine learning models to identify potential security threats including DoS/DDoS attacks, brute force attempts, and port scanning activity.
+
+## Current Status
+
+This is a **development build** with the following characteristics:
+
+- **Frontend**: Fully functional React application with real-time dashboard
+- **Backend**: REST API with in-memory data storage
+- **Data Source**: Development simulation (no live packet capture)
+- **ML Models**: Development detection model (rule-based heuristics)
+- **Database**: Not configured (in-memory storage only)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     React Frontend                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │Dashboard │ │ Traffic  │ │ Alerts   │ │ Threats  │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼ REST API
+┌─────────────────────────────────────────────────────────────┐
+│                   Express Backend                           │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+│  │Detection │ │Threat    │ │ Alert    │ │Dashboard │       │
+│  │Service   │ │Classifier│ │Service   │ │Service   │       │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+│                            │                                │
+│  ┌──────────────────────────────────────────────────┐      │
+│  │         In-Memory Repositories                     │      │
+│  │  (Traffic, Alerts, Predictions, Statistics)      │      │
+│  └──────────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Project Structure
+
+```
+NetGuard/
+├── frontend/                 # React + TypeScript + Vite
+│   ├── src/
+│   │   ├── components/      # Reusable UI components
+│   │   ├── layouts/         # App layout and navigation
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API client and service layer
+│   │   ├── types/           # TypeScript type definitions
+│   │   ├── utils/           # Utility functions
+│   │   └── App.tsx          # Main application component
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── backend/                  # Node.js + TypeScript + Express
+│   ├── src/
+│   │   ├── config/          # Environment configuration
+│   │   ├── controllers/     # Request handlers
+│   │   ├── middleware/      # Express middleware
+│   │   ├── models/          # Domain models and types
+│   │   ├── repositories/    # Data access layer
+│   │   │   ├── interfaces/  # Repository interfaces
+│   │   │   └── memory/      # In-memory implementations
+│   │   ├── routes/          # API route definitions
+│   │   ├── services/        # Business logic services
+│   │   ├── utils/           # Utility functions
+│   │   ├── app.ts           # Express application setup
+│   │   └── server.ts        # Server entry point
+│   ├── package.json
+│   └── tsconfig.json
+│
+└── README.md
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+
+### Backend Setup
+
+```bash
+cd backend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+The backend will start on `http://localhost:3001`
+
+### Frontend Setup
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+The frontend will start on `http://localhost:5173`
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/system/status` | System component status |
+| GET | `/api/dashboard/summary` | Dashboard overview data |
+| GET | `/api/traffic` | List traffic events |
+| GET | `/api/traffic/activity` | Traffic activity timeline |
+| GET | `/api/traffic/:id` | Get traffic event by ID |
+| GET | `/api/alerts` | List security alerts |
+| GET | `/api/alerts/counts` | Alert counts by status |
+| GET | `/api/alerts/:id` | Get alert by ID |
+| PATCH | `/api/alerts/:id/acknowledge` | Acknowledge alert |
+| PATCH | `/api/alerts/:id/resolve` | Resolve alert |
+| GET | `/api/threats` | List threat categories |
+| GET | `/api/threats/:category` | Get threat category details |
+| GET | `/api/models` | List ML models |
+| GET | `/api/models/evaluation` | Evaluation status |
+| GET | `/api/models/:id/evaluation` | Model evaluation details |
+
+## Current Threat Categories
+
+- **DoS/DDoS**: Denial of Service / Distributed Denial of Service attacks
+- **Brute Force**: Repeated authentication attempts
+- **Port Scan**: Systematic port probing activity
+
+## Development Simulation
+
+The current build uses a **Development Simulation** mode:
+
+- Traffic events are generated by the `SimulationService`
+- Detection uses rule-based heuristics (`DevelopmentDetectionModel`)
+- Data is stored in memory and resets on server restart
+- No real network packets are captured
+- No real ML models are used
+
+This is clearly labeled throughout the UI as "Simulation Mode".
+
+## Future Integration Points
+
+### Database (MongoDB)
+
+The repository pattern allows seamless integration of MongoDB:
+
+```typescript
+// Current: In-memory repository
+const trafficRepository = new InMemoryTrafficRepository();
+
+// Future: MongoDB repository (same interface)
+const trafficRepository = new MongoTrafficRepository(connection);
+```
+
+### Real ML Models
+
+The detection and classifier interfaces support model swapping:
+
+```typescript
+// Current: Development detection model
+const detector = new DevelopmentDetectionModel();
+
+// Future: Trained ML model
+const detector = new RandomForestModel(modelPath);
+```
+
+### Live Traffic Capture
+
+The traffic service can accept real packet data:
+
+```typescript
+// Current: Simulation
+simulationService.generateMixedScenario();
+
+// Future: Real packet capture
+trafficService.processPacketCapture(pcapData);
+```
+
+## Model Evaluation
+
+**Status: Not evaluated**
+
+No experimental results are available yet. The evaluation page shows the structure for:
+- Accuracy
+- Precision
+- Recall
+- F1-Score
+- Confusion Matrix
+
+These metrics will be populated after:
+1. Dataset collection and preparation
+2. Model training
+3. Experimental evaluation
+
+## License
+
+MIT
