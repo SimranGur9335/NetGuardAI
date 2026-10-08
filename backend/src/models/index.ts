@@ -37,8 +37,37 @@ export enum Protocol {
 }
 
 export enum MonitoringMode {
-  SIMULATION = 'SIMULATION',
+  /** Real packet capture is running. */
   LIVE = 'LIVE',
+  /** Capture is not running — no packets are being captured. */
+  OFFLINE = 'OFFLINE',
+}
+
+// ---------- Auth ----------
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  OPERATOR = 'OPERATOR',
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser;
 }
 
 // ---------- Traffic Event ----------

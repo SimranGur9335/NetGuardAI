@@ -1,20 +1,22 @@
 import { DashboardSummary, MonitoringMode, SystemComponent, ThreatDistribution, SeverityDistribution } from '../models';
 import { ITrafficRepository } from '../repositories/interfaces/ITrafficRepository';
 import { IAlertRepository } from '../repositories/interfaces/IAlertRepository';
+import { PacketCaptureService } from './capture/PacketCaptureService';
 import { logger } from '../utils/logger';
 
 export class DashboardService {
   constructor(
     private trafficRepository: ITrafficRepository,
-    private alertRepository: IAlertRepository
+    private alertRepository: IAlertRepository,
+    private captureService: PacketCaptureService
   ) {}
 
   async getSummary(): Promise<DashboardSummary> {
-    const [trafficCounts, alertCounts, recentEvents, recentAlerts] = await Promise.all([
+    const [trafficCounts, alertCounts, recentEvents, captureStatus] = await Promise.all([
       this.trafficRepository.countByClassification(),
       this.alertRepository.countByStatus(),
       this.trafficRepository.findRecent(10),
-      this.alertRepository.findRecent(5),
+      this.captureService.getStatus(),
     ]);
 
     const totalEvents = Object.values(trafficCounts).reduce((a, b) => a + b, 0);
@@ -37,7 +39,7 @@ export class DashboardService {
       count,
     }));
 
-    const systemHealth = this.getSystemHealth();
+    const systemHealth = this.getSystemHealth(captureStatus.available, captureStatus.running);
 
     return {
       totalEvents,
@@ -48,12 +50,12 @@ export class DashboardService {
       threatDistribution,
       severityDistribution,
       recentEvents,
-      monitoringMode: MonitoringMode.SIMULATION,
+      monitoringMode: captureStatus.running ? MonitoringMode.LIVE : MonitoringMode.OFFLINE,
       systemHealth,
     };
   }
 
-  private getSystemHealth(): SystemComponent[] {
+  private getSystemHealth(captureAvailable: boolean, captureRunning: boolean): SystemComponent[] {
     return [
       {
         name: 'Backend API',
@@ -61,29 +63,38 @@ export class DashboardService {
         details: 'API responding normally',
       },
       {
-        name: 'Traffic Monitor',
-        status: 'Simulation',
-        details: 'Development simulation mode - no live packet capture',
+        name: 'Packet Capture',
+        status: captureAvailable ? (captureRunning ? 'Active' : 'Ready') : 'Unavailable',
+        details: captureAvailable
+          ? captureRunning
+            ? `Capturing on ${captureRunning ? 'interface' : ''}`
+            : 'Ready to capture'
+          : 'Npcap not installed',
       },
       {
         name: 'Detection Engine',
-        status: 'Ready',
-        details: 'Development detection model active',
+        status: 'Operational',
+        details: 'Rule-based detection active',
       },
       {
         name: 'Threat Classifier',
-        status: 'Ready',
-        details: 'Rule-based classification active',
+        status: 'Operational',
+        details: 'Classification pipeline active',
       },
       {
         name: 'Alert Engine',
         status: 'Operational',
-        details: 'Alert generation and management active',
+        details: 'Alert generation active',
+      },
+      {
+        name: 'Authentication',
+        status: 'Operational',
+        details: 'JWT authentication active',
       },
       {
         name: 'Database',
         status: 'Not Configured',
-        details: 'In-memory storage - database integration pending',
+        details: 'In-memory storage only',
       },
     ];
   }

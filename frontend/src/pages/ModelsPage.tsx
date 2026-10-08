@@ -84,16 +84,18 @@ export function ModelsPage() {
         ))}
       </div>
 
-      <Card title="Development Detection Model">
+      <Card title="Development Detection Engine">
         <div className="space-y-3">
           <p className="text-sm text-gray-700">
-            During development, a rule-based detection model is used to simulate the detection pipeline.
-            This model applies simple heuristics to classify traffic and generate alerts for demonstration purposes.
+            The active detector is the Development Detection Engine: rule-based flow analysis over
+            real captured packets. It detects port scans, SYN-flood DoS/DDoS patterns and brute-force
+            connection attempts, and classifies everything else as normal traffic.
           </p>
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-600">
-              <strong>Note:</strong> This is not a real machine learning model. It will be replaced by
-              trained Random Forest and XGBoost models once the dataset is prepared and model training is complete.
+              <strong>Note:</strong> This is not a trained machine learning model, and no accuracy,
+              precision, recall or F1 metrics are reported for it. Trained Random Forest and XGBoost
+              models will replace it once the dataset is prepared and model training is complete.
             </p>
           </div>
         </div>

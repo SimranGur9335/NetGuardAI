@@ -8,13 +8,13 @@ NetGuard AI is a network security monitoring platform that detects, classifies, 
 
 ## Current Status
 
-This is a **development build** with the following characteristics:
+This build features **real packet capture** with the following characteristics:
 
-- **Frontend**: Fully functional React application with real-time dashboard
-- **Backend**: REST API with in-memory data storage
-- **Data Source**: Development simulation (no live packet capture)
-- **ML Models**: Development detection model (rule-based heuristics)
-- **Database**: Not configured (in-memory storage only)
+- **Frontend**: React application with login, protected routes and live monitoring controls
+- **Backend**: REST API with JWT authentication and in-memory data storage
+- **Data Source**: Real network packets captured via **tshark (Wireshark) over Npcap**
+- **Detection**: Development Detection Engine (rule-based flow analysis — not a trained ML model)
+- **Database**: None (bounded in-memory repositories only)
 
 ## Architecture
 
@@ -83,6 +83,18 @@ NetGuard/
 
 - Node.js 18+
 - npm 9+
+- **Npcap** — https://npcap.com/ (enable "Install Npcap in WinPcap API-compatible Mode")
+- **Wireshark/tshark** — https://www.wireshark.org/ (tshark must be on the PATH or installed in `C:\Program Files\Wireshark`)
+
+If Npcap or tshark is missing, the API honestly reports
+`Packet Capture: Unavailable` and **no traffic data is generated** — there is
+no simulation or fallback data.
+
+Verify capture capability:
+
+```bash
+tshark -D          # should list Npcap interfaces
+```
 
 ### Backend Setup
 
@@ -108,93 +120,85 @@ The frontend will start on `http://localhost:5173`
 
 ## API Endpoints
 
+All endpoints except `/api/health` and `POST /api/auth/login` require a JWT
+(`Authorization: Bearer <token>`). Start/stop monitoring, interface selection and
+alert acknowledge/resolve additionally require the ADMIN role.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/system/status` | System component status |
-| GET | `/api/dashboard/summary` | Dashboard overview data |
-| GET | `/api/traffic` | List traffic events |
-| GET | `/api/traffic/activity` | Traffic activity timeline |
-| GET | `/api/traffic/:id` | Get traffic event by ID |
-| GET | `/api/alerts` | List security alerts |
-| GET | `/api/alerts/counts` | Alert counts by status |
-| GET | `/api/alerts/:id` | Get alert by ID |
-| PATCH | `/api/alerts/:id/acknowledge` | Acknowledge alert |
-| PATCH | `/api/alerts/:id/resolve` | Resolve alert |
-| GET | `/api/threats` | List threat categories |
-| GET | `/api/threats/:category` | Get threat category details |
-| GET | `/api/models` | List ML models |
-| GET | `/api/models/evaluation` | Evaluation status |
-| GET | `/api/models/:id/evaluation` | Model evaluation details |
+| POST | `/api/auth/login` | Login, returns JWT |
+| GET | `/api/auth/me` | Current user (auth) |
+| POST | `/api/auth/logout` | Logout (auth) |
+| GET | `/api/health` | Health check (public) |
+| GET | `/api/system/status` | System component status (auth) |
+| GET | `/api/dashboard/summary` | Dashboard overview data (auth) |
+| GET | `/api/traffic` | List traffic events (auth) |
+| GET | `/api/traffic/activity` | Traffic activity timeline (auth) |
+| GET | `/api/traffic/:id` | Get traffic event by ID (auth) |
+| GET | `/api/alerts` | List security alerts (auth) |
+| GET | `/api/alerts/counts` | Alert counts by status (auth) |
+| GET | `/api/alerts/:id` | Get alert by ID (auth) |
+| PATCH | `/api/alerts/:id/acknowledge` | Acknowledge alert (admin) |
+| PATCH | `/api/alerts/:id/resolve` | Resolve alert (admin) |
+| GET | `/api/threats` | List threat categories (auth) |
+| GET | `/api/threats/:category` | Get threat category details (auth) |
+| GET | `/api/models` | List models (auth) |
+| GET | `/api/models/evaluation` | Evaluation status (auth) |
+| GET | `/api/models/:id/evaluation` | Model evaluation details (auth) |
+| GET | `/api/monitoring/interfaces` | Discover capture interfaces (auth) |
+| GET | `/api/monitoring/status` | Capture status (auth) |
+| POST | `/api/monitoring/start` | Start real capture `{interfaceId}` (admin) |
+| POST | `/api/monitoring/stop` | Stop real capture (admin) |
 
 ## Current Threat Categories
 
-- **DoS/DDoS**: Denial of Service / Distributed Denial of Service attacks
-- **Brute Force**: Repeated authentication attempts
-- **Port Scan**: Systematic port probing activity
+- **DoS/DDoS**: SYN-flood signatures (>=80 SYNs from one source to one destination per second)
+- **Brute Force**: >=15 connection attempts to one auth-service port (SSH/RDP/SMB/FTP/DB) within 30s
+- **Port Scan**: >=15 distinct ports probed on one destination, or >=25 distinct destination ports from one source within 10s
 
-## Development Simulation
+## Real Packet Capture
 
-The current build uses a **Development Simulation** mode:
+The capture pipeline (no simulation anywhere):
 
-- Traffic events are generated by the `SimulationService`
-- Detection uses rule-based heuristics (`DevelopmentDetectionModel`)
-- Data is stored in memory and resets on server restart
-- No real network packets are captured
-- No real ML models are used
+```
+tshark/Npcap capture → PacketNormalizer → FeatureExtractor →
+DetectionService (Development Detection Engine) → ThreatClassificationService →
+AlertService → in-memory repositories → REST API → React dashboard
+```
 
-This is clearly labeled throughout the UI as "Simulation Mode".
+- Interfaces are discovered with `tshark -D` (Npcap devices) and enriched via `Get-NetAdapter`
+- Capture runs as a real tshark child process; stopping kills the process tree
+- Alerts are generated only from real captured packets and are de-duplicated
+  (one alert per category/endpoints per 2 minutes)
+- In-memory repositories are bounded (oldest events are dropped beyond the cap)
+
+## ML / Detection Honesty
+
+The active detector is the **Development Detection Engine** — rule-based flow
+analysis. It is **not** a trained machine learning model. Random Forest and
+XGBoost are listed as `Not Trained`, and all evaluation metrics (accuracy,
+precision, recall, F1, confusion matrix) are reported as
+**Not Trained / Not Available** — never fabricated.
 
 ## Future Integration Points
 
-### Database (MongoDB)
-
-The repository pattern allows seamless integration of MongoDB:
-
-```typescript
-// Current: In-memory repository
-const trafficRepository = new InMemoryTrafficRepository();
-
-// Future: MongoDB repository (same interface)
-const trafficRepository = new MongoTrafficRepository(connection);
-```
-
 ### Real ML Models
 
-The detection and classifier interfaces support model swapping:
+The detection interface supports model swapping:
 
 ```typescript
-// Current: Development detection model
-const detector = new DevelopmentDetectionModel();
+// Current: rule-based development engine
+const detector = new FlowBasedDetectionModel();
 
-// Future: Trained ML model
+// Future: trained ML model
 const detector = new RandomForestModel(modelPath);
-```
-
-### Live Traffic Capture
-
-The traffic service can accept real packet data:
-
-```typescript
-// Current: Simulation
-simulationService.generateMixedScenario();
-
-// Future: Real packet capture
-trafficService.processPacketCapture(pcapData);
 ```
 
 ## Model Evaluation
 
-**Status: Not evaluated**
+**Status: Not Trained / Not Available**
 
-No experimental results are available yet. The evaluation page shows the structure for:
-- Accuracy
-- Precision
-- Recall
-- F1-Score
-- Confusion Matrix
-
-These metrics will be populated after:
+No experimental results exist. Metrics will only be populated after:
 1. Dataset collection and preparation
 2. Model training
 3. Experimental evaluation

@@ -2,6 +2,8 @@ import { IPredictionRepository } from '../interfaces/IPredictionRepository';
 import { Prediction } from '../../models';
 
 export class InMemoryPredictionRepository implements IPredictionRepository {
+  /** Retained in-memory predictions — oldest are dropped beyond this bound. */
+  private static readonly MAX_PREDICTIONS = 20_000;
   private predictions: Prediction[] = [];
 
   async findAll(limit = 100): Promise<Prediction[]> {
@@ -16,6 +18,9 @@ export class InMemoryPredictionRepository implements IPredictionRepository {
 
   async save(prediction: Prediction): Promise<Prediction> {
     this.predictions.push(prediction);
+    if (this.predictions.length > InMemoryPredictionRepository.MAX_PREDICTIONS) {
+      this.predictions.splice(0, this.predictions.length - InMemoryPredictionRepository.MAX_PREDICTIONS);
+    }
     return prediction;
   }
 

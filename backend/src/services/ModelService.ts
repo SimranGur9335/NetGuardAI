@@ -2,28 +2,39 @@ import { ModelInfo, EvaluationResult, EvaluationMetrics, ConfusionMatrix } from 
 
 /**
  * ModelService
- * Provides information about ML models used in the system.
- * Currently returns development/simulation model information.
+ * Provides information about detection models used in the system.
+ * The active engine is a rule-based development detector — NOT a trained ML
+ * model. Planned ML models are reported as "Not Trained" until training and
+ * evaluation actually happen. No metrics are ever fabricated.
  */
 export class ModelService {
   private models: ModelInfo[] = [
     {
+      id: 'dev-flow-model',
+      name: 'Development Detection Engine',
+      type: 'Rule-based flow analysis (not a trained ML model)',
+      status: 'Operational',
+      detectionStage: 'Intrusion detection',
+      classificationStage: 'Threat classification',
+      evaluationStatus: 'Not Applicable — rules-based, no trained metrics',
+    },
+    {
       id: 'rf-model',
       name: 'Random Forest',
       type: 'Ensemble Learning',
-      status: 'Available for integration',
+      status: 'Not Trained',
       detectionStage: 'Intrusion detection',
       classificationStage: 'Suspicious traffic classification',
-      evaluationStatus: 'Pending',
+      evaluationStatus: 'Not Available',
     },
     {
       id: 'xgb-model',
       name: 'XGBoost',
       type: 'Gradient Boosting',
-      status: 'Available for integration',
+      status: 'Not Trained',
       detectionStage: 'Intrusion detection',
       classificationStage: 'Threat classification',
-      evaluationStatus: 'Pending',
+      evaluationStatus: 'Not Available',
     },
   ];
 
@@ -56,10 +67,11 @@ export class ModelService {
     return {
       modelId: model.id,
       modelName: model.name,
-      status: 'Not evaluated',
+      status: 'Not Trained',
       metrics,
       confusionMatrix,
-      message: 'Evaluation data not available yet. Experimental results will be populated after model training and testing.',
+      message:
+        'Not Trained / Not Available. No trained model exists yet, so accuracy, precision, recall, F1 and confusion matrix are unavailable. Results will be populated only after dataset collection, training and evaluation.',
     };
   }
 

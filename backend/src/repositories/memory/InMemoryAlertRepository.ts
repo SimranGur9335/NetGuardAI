@@ -2,6 +2,8 @@ import { IAlertRepository } from '../interfaces/IAlertRepository';
 import { Alert, AlertQueryParams, AlertStatus, PaginatedResponse } from '../../models';
 
 export class InMemoryAlertRepository implements IAlertRepository {
+  /** Retained in-memory alerts — oldest are dropped beyond this bound. */
+  private static readonly MAX_ALERTS = 5_000;
   private alerts: Alert[] = [];
 
   async findAll(params?: AlertQueryParams): Promise<PaginatedResponse<Alert>> {
@@ -57,6 +59,9 @@ export class InMemoryAlertRepository implements IAlertRepository {
 
   async save(alert: Alert): Promise<Alert> {
     this.alerts.push(alert);
+    if (this.alerts.length > InMemoryAlertRepository.MAX_ALERTS) {
+      this.alerts.splice(0, this.alerts.length - InMemoryAlertRepository.MAX_ALERTS);
+    }
     return alert;
   }
 

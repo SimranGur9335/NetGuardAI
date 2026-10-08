@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getDashboardSummary } from '../services/dashboard';
-import { getSimulationStatus, startSimulation, stopSimulation } from '../services/simulation';
-import { DashboardSummary, SimulationStatus } from '../types';
+import { getCaptureStatus, startMonitoring, stopMonitoring, getInterfaces } from '../services/monitoring';
+import { DashboardSummary, CaptureStatus, NetworkInterface } from '../types';
 import { Card } from '../components/ui/Card';
 import { ErrorState } from '../components/ui/ErrorState';
 import { StatusIndicator } from '../components/ui/StatusIndicator';
@@ -11,9 +11,12 @@ import { TableSkeleton } from '../components/ui/Skeleton';
 
 export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [simStatus, setSimStatus] = useState<SimulationStatus | null>(null);
+  const [captureStatus, setCaptureStatus] = useState<CaptureStatus | null>(null);
+  const [interfaces, setInterfaces] = useState<NetworkInterface[]>([]);
+  const [selectedInterface, setSelectedInterface] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     try {
@@ -27,47 +30,72 @@ export function DashboardPage() {
     }
   }, []);
 
-  const loadSimStatus = useCallback(async () => {
+  const loadCaptureStatus = useCallback(async () => {
     try {
-      const status = await getSimulationStatus();
-      setSimStatus(status);
+      const status = await getCaptureStatus();
+      setCaptureStatus(status);
     } catch {
       // Silently fail for status check
     }
   }, []);
 
+  const loadInterfaces = useCallback(async () => {
+    try {
+      const data = await getInterfaces();
+      setInterfaces(data);
+      if (data.length > 0 && !selectedInterface) {
+        // Prefer an active interface that actually has an IPv4 address,
+        // then any active interface, then anything listed.
+        const active =
+          data.find((i) => i.status === 'up' && i.ipv4) ||
+          data.find((i) => i.status === 'up') ||
+          data[0];
+        setSelectedInterface(active.id);
+      }
+    } catch {
+      // Silently fail for interfaces
+    }
+  }, [selectedInterface]);
+
   // Initial load
   useEffect(() => {
     loadSummary();
-    loadSimStatus();
-  }, [loadSummary, loadSimStatus]);
+    loadCaptureStatus();
+    loadInterfaces();
+  }, [loadSummary, loadCaptureStatus, loadInterfaces]);
 
   // Auto-refresh every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       loadSummary();
-      loadSimStatus();
+      loadCaptureStatus();
     }, 5000);
     return () => clearInterval(interval);
-  }, [loadSummary, loadSimStatus]);
+  }, [loadSummary, loadCaptureStatus]);
 
-  async function handleStartSimulation() {
+  async function handleStartMonitoring() {
     try {
-      const status = await startSimulation();
-      setSimStatus(status);
+      setActionError(null);
+      if (!selectedInterface) {
+        setActionError('Please select a network interface first');
+        return;
+      }
+      const status = await startMonitoring(selectedInterface);
+      setCaptureStatus(status);
       // Refresh data immediately
       setTimeout(loadSummary, 1000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start simulation');
+      setActionError(err instanceof Error ? err.message : 'Failed to start monitoring');
     }
   }
 
-  async function handleStopSimulation() {
+  async function handleStopMonitoring() {
     try {
-      const status = await stopSimulation();
-      setSimStatus(status);
+      setActionError(null);
+      const status = await stopMonitoring();
+      setCaptureStatus(status);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop simulation');
+      setActionError(err instanceof Error ? err.message : 'Failed to stop monitoring');
     }
   }
 
@@ -109,39 +137,66 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Simulation Control Banner */}
+      {/* Monitoring Control Banner */}
       <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className={`w-2 h-2 rounded-full ${simStatus?.running ? 'bg-normal-500' : 'bg-gray-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${captureStatus?.running ? 'bg-normal-500' : 'bg-gray-400'}`} />
             <span className="text-sm font-medium text-gray-900">
-              {simStatus?.running ? 'Simulation Running' : 'Simulation Stopped'}
-            </span>
-            <span className="text-sm text-gray-500">
-              — Development Simulation
+              {captureStatus?.running ? 'Monitoring Active' : 'Monitoring Inactive'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            {simStatus?.running ? (
+          <div className="flex items-center gap-3">
+            {!captureStatus?.running && (
+              <select
+                value={selectedInterface}
+                onChange={(e) => setSelectedInterface(e.target.value)}
+                className="text-sm border border-gray-300 rounded-md px-3 py-1.5"
+              >
+                {interfaces.map((iface) => (
+                  <option key={iface.id} value={iface.id}>
+                    {iface.name} ({iface.ipv4 || 'No IP'})
+                  </option>
+                ))}
+              </select>
+            )}
+            {captureStatus?.running ? (
               <button
-                onClick={handleStopSimulation}
+                onClick={handleStopMonitoring}
                 className="px-3 py-1.5 text-sm font-medium text-white bg-critical-600 rounded hover:bg-critical-700 transition-colors"
               >
-                Stop Simulation
+                Stop Monitoring
               </button>
             ) : (
               <button
-                onClick={handleStartSimulation}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-normal-600 rounded hover:bg-normal-700 transition-colors"
+                onClick={handleStartMonitoring}
+                disabled={!captureStatus?.available}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-normal-600 rounded hover:bg-normal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Start Simulation
+                Start Monitoring
               </button>
             )}
           </div>
         </div>
-        {simStatus?.running && (
+        {actionError && (
+          <div className="mt-2 text-xs text-critical-600 bg-critical-50 border border-critical-200 rounded px-2 py-1.5">
+            {actionError}
+          </div>
+        )}
+        {captureStatus && !captureStatus.available && (
+          <div className="mt-2 text-xs text-critical-600 bg-critical-50 border border-critical-200 rounded px-2 py-1.5">
+            <span className="font-semibold">Packet Capture: Unavailable.</span>{' '}
+            {captureStatus.reason || 'Npcap or another supported capture mechanism is not installed.'}
+          </div>
+        )}
+        {captureStatus?.running && (
           <div className="mt-2 text-xs text-gray-500">
-            Generating events every {simStatus.interval / 1000}s — No live network traffic capture connected
+            Capturing real packets on {captureStatus.interfaceName || 'selected interface'} — {captureStatus.packetsCaptured} packets captured ({captureStatus.captureMethod})
+          </div>
+        )}
+        {captureStatus && captureStatus.available && !captureStatus.running && (
+          <div className="mt-2 text-xs text-gray-500">
+            Capture ready. Select a network interface and start monitoring to capture real packets.
           </div>
         )}
       </div>
@@ -218,10 +273,12 @@ export function DashboardPage() {
                   status={
                     component.status === 'Operational'
                       ? 'operational'
-                      : component.status === 'Simulation'
-                      ? 'simulation'
+                      : component.status === 'Active'
+                      ? 'operational'
                       : component.status === 'Ready'
                       ? 'ready'
+                      : component.status === 'Unavailable'
+                      ? 'error'
                       : component.status === 'Not Configured'
                       ? 'not_configured'
                       : 'error'
@@ -236,7 +293,11 @@ export function DashboardPage() {
       {/* Recent Events */}
       <Card title="Recent Security Events">
         {summary.recentEvents.length === 0 ? (
-          <p className="text-sm text-gray-500">No recent events</p>
+          <p className="text-sm text-gray-500">
+            {captureStatus?.running
+              ? 'No network traffic captured yet — waiting for packets on the selected interface.'
+              : 'No network traffic captured yet. Start monitoring to capture real packets.'}
+          </p>
         ) : (
           <div className="table-container">
             <table className="data-table">

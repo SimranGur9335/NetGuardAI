@@ -10,26 +10,48 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
+  private getToken(): string | null {
+    return localStorage.getItem('netguard_token');
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const token = this.getToken();
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
 
     const config: RequestInit = {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
     };
 
     const response = await fetch(url, config);
-    const body = await response.json();
 
-    if (!response.ok || !body.success) {
-      const error = body as ApiError;
-      throw new Error(error.error?.message || `Request failed with status ${response.status}`);
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      // Non-JSON response body
+    }
+
+    if (response.status === 401) {
+      // Expired/invalid session — notify the auth layer so the app logs out.
+      window.dispatchEvent(new Event('netguard:unauthorized'));
+    }
+
+    if (!response.ok || !(body as ApiResponse<T> | null)?.success) {
+      const error = body as ApiError | null;
+      throw new Error(error?.error?.message || `Request failed with status ${response.status}`);
     }
 
     return (body as ApiResponse<T>).data;

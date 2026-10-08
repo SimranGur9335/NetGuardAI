@@ -17,8 +17,9 @@ export class EvaluationService {
     const evaluations = await this.modelService.getAllEvaluations();
 
     return {
-      overallStatus: 'Not evaluated',
-      message: 'No experimental results available yet. Model evaluation will be conducted after dataset collection and model training.',
+      overallStatus: 'Not Trained',
+      message:
+        'Not Trained / Not Available. No experimental results exist — metrics will only be reported after dataset collection and model training.',
       evaluations,
     };
   }

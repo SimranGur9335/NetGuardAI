@@ -2,6 +2,8 @@ import { ITrafficRepository } from '../interfaces/ITrafficRepository';
 import { TrafficEvent, TrafficQueryParams, PaginatedResponse, ThreatCategory } from '../../models';
 
 export class InMemoryTrafficRepository implements ITrafficRepository {
+  /** Retained in-memory events — oldest are dropped beyond this bound. */
+  private static readonly MAX_EVENTS = 20_000;
   private events: TrafficEvent[] = [];
 
   async findAll(params?: TrafficQueryParams): Promise<PaginatedResponse<TrafficEvent>> {
@@ -56,11 +58,17 @@ export class InMemoryTrafficRepository implements ITrafficRepository {
 
   async save(event: TrafficEvent): Promise<TrafficEvent> {
     this.events.push(event);
+    if (this.events.length > InMemoryTrafficRepository.MAX_EVENTS) {
+      this.events.splice(0, this.events.length - InMemoryTrafficRepository.MAX_EVENTS);
+    }
     return event;
   }
 
   async saveMany(events: TrafficEvent[]): Promise<TrafficEvent[]> {
     this.events.push(...events);
+    if (this.events.length > InMemoryTrafficRepository.MAX_EVENTS) {
+      this.events.splice(0, this.events.length - InMemoryTrafficRepository.MAX_EVENTS);
+    }
     return events;
   }
 

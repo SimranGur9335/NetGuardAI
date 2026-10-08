@@ -36,8 +36,10 @@ export enum Protocol {
 }
 
 export enum MonitoringMode {
-  SIMULATION = 'SIMULATION',
+  /** Real packet capture is running. */
   LIVE = 'LIVE',
+  /** Capture is not running — no packets are being captured. */
+  OFFLINE = 'OFFLINE',
 }
 
 // ---------- Traffic Event ----------
@@ -131,6 +133,14 @@ export interface SystemComponent {
 export interface SystemStatus {
   components: SystemComponent[];
   monitoringMode: string;
+  capture?: {
+    available: boolean;
+    running: boolean;
+    reason: string | null;
+    method: string;
+    interfaceName: string | null;
+    packetsCaptured: number;
+  };
   timestamp: string;
 }
 
@@ -212,12 +222,43 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-// ---------- Simulation ----------
+// ---------- Auth ----------
 
-export interface SimulationStatus {
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  OPERATOR = 'OPERATOR',
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+
+// ---------- Network / Capture ----------
+
+export interface NetworkInterface {
+  id: string;
+  name: string;
+  description: string;
+  ipv4: string | null;
+  ipv6: string | null;
+  mac: string | null;
+  status: 'up' | 'down';
+}
+
+export interface CaptureStatus {
   running: boolean;
-  mode: string;
-  interval: number;
+  interfaceId: string | null;
+  interfaceName: string | null;
+  packetsCaptured: number;
   startedAt: string | null;
-  message?: string;
+  captureMethod: string;
+  available: boolean;
+  reason: string | null;
 }

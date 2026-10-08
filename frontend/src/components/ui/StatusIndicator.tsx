@@ -1,11 +1,12 @@
 interface StatusIndicatorProps {
-  status: 'operational' | 'simulation' | 'ready' | 'not_configured' | 'error';
+  status: 'operational' | 'active' | 'unavailable' | 'ready' | 'not_configured' | 'error';
   label?: string;
 }
 
 const statusConfig = {
   operational: { color: 'bg-normal-500', text: 'Operational' },
-  simulation: { color: 'bg-warning-500', text: 'Simulation' },
+  active: { color: 'bg-normal-500', text: 'Active' },
+  unavailable: { color: 'bg-critical-500', text: 'Unavailable' },
   ready: { color: 'bg-informational-500', text: 'Ready' },
   not_configured: { color: 'bg-gray-400', text: 'Not Configured' },
   error: { color: 'bg-critical-500', text: 'Error' },

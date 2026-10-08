@@ -4,8 +4,16 @@ import { generateAlertId } from '../utils/idGenerator';
 import { logger } from '../utils/logger';
 
 export class AlertService {
+  /** Suppress duplicate alerts for the same category/source/destination within this window. */
+  private static readonly ALERT_COOLDOWN_MS = 120_000;
+  private recentAlerts = new Map<string, number>();
+
   constructor(private alertRepository: IAlertRepository) {}
 
+  /**
+   * Create an alert, unless an identical alert (category + endpoints) was
+   * already raised within the cooldown window — returns null when suppressed.
+   */
   async createAlert(params: {
     category: ThreatCategory;
     severity: Severity;
@@ -15,7 +23,16 @@ export class AlertService {
     description: string;
     prediction?: string;
     detectionSource: string;
-  }): Promise<Alert> {
+  }): Promise<Alert | null> {
+    const now = Date.now();
+    const key = `${params.category}:${params.sourceIp}:${params.destinationIp}:${params.protocol}`;
+    const last = this.recentAlerts.get(key);
+    if (last !== undefined && now - last < AlertService.ALERT_COOLDOWN_MS) {
+      return null;
+    }
+    this.recentAlerts.set(key, now);
+    this.pruneRecentAlerts(now);
+
     const alert: Alert = {
       id: generateAlertId(),
       timestamp: new Date().toISOString(),
@@ -77,5 +94,14 @@ export class AlertService {
 
   async getRecentAlerts(limit: number): Promise<Alert[]> {
     return this.alertRepository.findRecent(limit);
+  }
+
+  /** Keep the cooldown map bounded. */
+  private pruneRecentAlerts(now: number): void {
+    for (const [key, t] of this.recentAlerts) {
+      if (now - t >= AlertService.ALERT_COOLDOWN_MS) {
+        this.recentAlerts.delete(key);
+      }
+    }
   }
 }

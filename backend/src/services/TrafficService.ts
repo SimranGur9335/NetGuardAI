@@ -39,8 +39,8 @@ export class TrafficService {
       trafficEvent.severity = classification.severity;
       trafficEvent.description = classification.description;
 
-      // Alert generation
-      await this.alertService.createAlert({
+      // Alert generation (deduplicated by cooldown in AlertService)
+      const alert = await this.alertService.createAlert({
         category: classification.category,
         severity: classification.severity,
         sourceIp: trafficEvent.sourceIp,
@@ -48,8 +48,14 @@ export class TrafficService {
         protocol: trafficEvent.protocol,
         description: classification.description,
         prediction: `${detectionResult.classification} (${(detectionResult.confidence * 100).toFixed(1)}%)`,
-        detectionSource: 'DevelopmentDetectionModel',
+        detectionSource: 'Development Detection Engine (Rule-Based)',
       });
+      if (alert) {
+        logger.info('Alert raised from captured traffic', {
+          alertId: alert.id,
+          category: alert.category,
+        });
+      }
     }
 
     await this.trafficRepository.save(trafficEvent);
